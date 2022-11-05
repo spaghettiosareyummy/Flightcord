@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#credentials
+*creds.py
+
 # C extensions
 *.so
 
@@ -127,6 +130,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-# Creds
-*creds.py
