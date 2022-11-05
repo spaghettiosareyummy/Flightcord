@@ -129,4 +129,4 @@ dmypy.json
 .pyre/
 
 # Creds
-creds.py
+/creds.py
