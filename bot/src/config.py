@@ -1,6 +1,8 @@
+from dotenv import load_dotenv
+import os
 
-"Enable DEBUG messages for logging"
+load_dotenv()
+
 DEBUG = False
 
-"""The scope for your bot to operate in. This should be a guild ID or list of guild IDs"""
-DEV_GUILD = None
+DEV_GUILD = int(os.environ.get("DEV_GUILD"))

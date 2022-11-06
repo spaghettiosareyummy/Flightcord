@@ -1,13 +1,5 @@
-"""
-Custom logging script
-
-Code taken from my contributions in:
-https://github.com/savioxavier/repo-finder-bot/
-Additional thanks to savioxavier
-"""
-
 import logging
-from config import DEBUG # pylint: disable=import-error # This works fine?
+from src.config import DEBUG # pylint: disable=import-error # This works fine?
 
 
 class CustomFormatter(logging.Formatter):
@@ -57,8 +49,8 @@ def overwrite_ipy_loggers():
             "client",
             "context"
         ]:
-            for h in v.handlers:  # type: ignore
-                h.setFormatter(CustomFormatter)  # type: ignore
+            for h in v.handlers:
+                h.setFormatter(CustomFormatter)
 
 
 def get_logger(name):

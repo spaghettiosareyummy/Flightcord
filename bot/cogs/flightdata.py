@@ -23,7 +23,7 @@ class GetFlight(interactions.Extension):
             'access_key': os.environ.get("API_ACCESS")
         }
 
-        api_result = requests.get('https://api.aviationstack.com/v1/flights', params)
+        api_result = requests.get('http://api.aviationstack.com/v1/flights', params)
 
         api_response = api_result.json()
 

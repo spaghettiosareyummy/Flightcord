@@ -12,8 +12,8 @@ import interactions
 from dotenv import load_dotenv
 from interactions import MISSING
 
-from config import DEBUG, DEV_GUILD
-import logutil
+from src.config import DEBUG, DEV_GUILD
+from src import logutil
 
 load_dotenv()
 
@@ -71,24 +71,21 @@ async def on_ready():
 # This omits __init__.py, template.py, and excludes files without a py file extension
 cogs = [
     module[:-3]
-    for module in os.listdir(f"{os.path.dirname(__file__)}\\..\\cogs")
+    for module in os.listdir(f"{os.path.dirname(__file__)}/cogs")
     if module not in ("__init__.py", "template.py") and module[-3:] == ".py"
 ]
 
-print(cogs)
-
-print("sus")
 if cogs or cogs == []:
     logger.info("Importing %s cogs: %s", len(cogs), ", ".join(cogs))
-    print("sus")
 else:
-    logger.error("Could not load any cogs!")
+    logger.warning("Could not import any cogs!")
 
 for cog in cogs:
     try:
-        client.load("cogs." + cog)
-    except Exception:  # noqa
+        client.load(f"cogs.{cog}")
+    except Exception as e:  # noqa
         logger.error("Could not load a cog: {}".format(cog), exc_info=DEBUG)
+        logger.error(e)
 
 # END cogs_dynamic_loader
 
