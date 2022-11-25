@@ -4,6 +4,7 @@ from src.config import DEV_GUILD
 from src import logutil
 import requests
 from dotenv import load_dotenv
+from pprint import pprint
 
 logger = logutil.init_logger(os.path.basename(__file__))
 load_dotenv()
@@ -16,26 +17,32 @@ class GetFlight(interactions.Extension):
         logger.info(f"{__class__.__name__} cog registered")
 
     @interactions.extension_command(
-        name="test", description="test command", scope=DEV_GUILD
+        name="getflight", description="test command", scope=DEV_GUILD
     )
-    async def test_cmd(self, ctx: interactions.CommandContext):
-        params = {
-            'access_key': os.environ.get("API_ACCESS")
+    async def getflight(self, ctx: interactions.CommandContext):
+
+        url = "https://aerodatabox.p.rapidapi.com/flights/callsign/CLX44K"
+
+        querystring = {"withAircraftImage":"false","withLocation":"false"}
+
+        headers = {
+            "X-RapidAPI-Key": os.environ.get("KEY"),
+            "X-RapidAPI-Host": "aerodatabox.p.rapidapi.com"
         }
 
-        api_result = requests.get('http://api.aviationstack.com/v1/flights', params)
+        response = requests.request("GET", url, headers=headers, params=querystring)
+        api_response = response.json()
+        # print(api_response['departure']['airport']['name'])
 
-        api_response = api_result.json()
-
-        for flight in api_response['results']:
-            if (flight['live']['is_ground'] is False):
+        for flight in range(len(api_response)):
+            if (api_response[flight]['departure']['airport']['name'] is not None):
                 print(u'%s flight %s from %s (%s) to %s (%s) is in the air.' % (
-                    flight['airline']['name'],
-                    flight['flight']['iata'],
-                    flight['departure']['airport'],
-                    flight['departure']['iata'],
-                    flight['arrival']['airport'],
-                    flight['arrival']['iata']))
+                    api_response[flight]['airline']['name'],
+                    api_response[flight]['number'],
+                    api_response[flight]['departure']['airport']['name'],
+                    api_response[flight]['departure']['airport']['iata'],
+                    api_response[flight]['arrival']['airport']['name'],
+                    api_response[flight]['arrival']['airport']['iata']))
 
 
 def setup(client: interactions.Client):
