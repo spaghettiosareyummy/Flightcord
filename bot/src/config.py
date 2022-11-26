@@ -3,6 +3,6 @@ import os
 
 load_dotenv()
 
-DEBUG = False
+DEBUG = True
 
 DEV_GUILD = int(os.environ.get("DEV_GUILD"))

@@ -50,7 +50,7 @@ client = interactions.Client(
         activities=[
             interactions.PresenceActivity(
                 type=interactions.PresenceActivityType.WATCHING,
-                name="you."
+                name="for flights"
             )
         ],
         status=interactions.StatusType.ONLINE
