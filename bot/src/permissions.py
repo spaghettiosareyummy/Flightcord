@@ -51,4 +51,4 @@ class Permissions(Enum):
 def has_permission(permission_val: int, permission: Union[Permissions, int]) -> bool:
     if isinstance(permission, Permissions):
         permission = permission.value
-    return permission_val & (1 << permission) == 1 << permission  # type: ignore
+    return permission_val & (1 << permission) == 1 << permission
