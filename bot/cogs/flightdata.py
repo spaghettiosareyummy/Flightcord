@@ -1,6 +1,6 @@
 import os
 import interactions
-from src.config import DEV_GUILD
+from src.config import DEV_GUILD 
 from src import logutil
 import requests
 from dotenv import load_dotenv
@@ -23,45 +23,6 @@ class GetFlight(interactions.Extension):
 
         self.client: interactions.Client = client
         logger.info(f"{__class__.__name__} cog registered")
-
-    # @interactions.extension_command(
-    #     name="getflight", 
-    #     description="search for a flight",
-    #     scope=DEV_GUILD,
-    #     options = [
-    #         interactions.Option(
-    #             name="searchwith",
-    #             description="Method to use for searching",
-    #             type=interactions.OptionType.SUB_COMMAND,
-    #             options = [
-    #                 interactions.Option(
-    #                     name="callsign",
-    #                     description="Search by callsign",
-    #                     type=interactions.OptionType.STRING,
-    #                     required=False,
-    #                 ),
-    #                 interactions.Option(
-    #                     name = "flightnumber",
-    #                     description = "Search by flight number",
-    #                     type = interactions.OptionType.STRING,
-    #                     required = False,
-    #                 ),
-    #                 interactions.Option(
-    #                     name="reg",
-    #                     description="Search by registration",
-    #                     type=interactions.OptionType.STRING,
-    #                     required=False,
-    #                 ),
-    #                 interactions.Option(
-    #                     name="icao24",
-    #                     description="Search by ICAO24",
-    #                     type=interactions.OptionType.STRING,
-    #                     required=False,
-    #                 ),
-    #             ],
-    #         ),
-    #     ],
-    # )
 
     @interactions.extension_command(
         name="getflight",
@@ -86,6 +47,7 @@ class GetFlight(interactions.Extension):
     )
     async def searchwith(self, ctx:interactions.CommandContext, callsign:str=None, flightnumber:str=None, reg:str=None, icao24:str=None) -> None:
         """The Subcommand for the getflight command"""
+        
         if callsign:
             url = f"https://aerodatabox.p.rapidapi.com/flights/callsign/{callsign}"
         elif flightnumber:
@@ -107,7 +69,7 @@ class GetFlight(interactions.Extension):
             api_response = response.json()
         except json.decoder.JSONDecodeError as err:
             logger.error(err)
-            await ctx.send(f"Flight not found, check your input and try again", ephemeral=True)
+            await ctx.send("Flight not found, check your input and try again", ephemeral=True)
             return
 
         for flight in range(len(api_response)):
