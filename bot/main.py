@@ -1,13 +1,6 @@
-"""
-Main script to run
-This script initializes cogs and starts the bot
-Code taken from my contributions in:
-https://github.com/savioxavier/repo-finder-bot/
-Additional thanks to savioxavier
-"""
 import os
 import sys
-
+import pymongo
 import interactions
 from dotenv import load_dotenv
 from interactions import MISSING
@@ -49,15 +42,18 @@ client = interactions.Client(
     presence=interactions.ClientPresence(
         activities=[
             interactions.PresenceActivity(
-                type=interactions.PresenceActivityType.WATCHING,
-                name="for flights"
+                type=interactions.PresenceActivityType.WATCHING, name="for flights"
             )
         ],
-        status=interactions.StatusType.ONLINE
+        status=interactions.StatusType.ONLINE,
     ),
-    disable_sync=False
+    disable_sync=False,
 )
 
+# connect to the pymongo database using the environment variables
+pymongo_client = pymongo.MongoClient(os.environ.get("DB_URI"))
+# get the database
+database = pymongo_client.FlightDB
 
 # BEGIN on_ready
 @client.event
