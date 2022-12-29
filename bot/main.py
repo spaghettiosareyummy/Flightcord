@@ -4,6 +4,7 @@ import pymongo
 import interactions
 from dotenv import load_dotenv
 from interactions import MISSING
+from interactions.ext.wait_for import setup
 
 from src.config import DEBUG, DEV_GUILD
 from src import logutil
@@ -49,6 +50,8 @@ client = interactions.Client(
     ),
     disable_sync=False,
 )
+
+setup(client)
 
 # connect to the pymongo database using the environment variables
 pymongo_client = pymongo.MongoClient(os.environ.get("DB_URI"))
