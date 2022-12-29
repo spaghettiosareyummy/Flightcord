@@ -95,7 +95,6 @@ class FlightHistory(interactions.Extension):
             async def check(button_ctx):
                 if int(button_ctx.author.id) == int(ctx.author.id):
                     return True
-                await ctx.send("You can't use this button!", ephemeral=True)
                 return False
 
             while True:
@@ -153,7 +152,7 @@ class FlightHistory(interactions.Extension):
                                 embeds=pages[current_index], components=buttons
                             )
                     elif button_ctx.custom_id == "last":
-                        current_index = -1
+                        current_index = len(pages)
                         buttons[0].disabled = False
                         buttons[1].disabled = False
                         buttons[2].disabled = True
@@ -161,12 +160,97 @@ class FlightHistory(interactions.Extension):
                         await button_ctx.defer(edit_origin=True)
                         await button_ctx.edit(embeds=pages[-1], components=buttons)
                     elif button_ctx.custom_id == "delete":
-                        collection.delete_many({"user_id": int(ctx.author.id)})
-                        await button_ctx.defer(
-                            edit_origin=True,
-                            ephemeral=True,
+                        # collection.delete_many({"user_id": int(ctx.author.id)})
+                        # await button_ctx.defer(
+                        #     edit_origin=True,
+                        #     ephemeral=True,
+                        # )
+                        # await button_ctx.edit("Your history has been deleted!")
+                        buttons[0].disabled = True
+                        buttons[1].disabled = True
+                        buttons[2].disabled = True
+                        buttons[3].disabled = True
+                        buttons[4].disabled = True
+                        await button_ctx.defer(edit_origin=True)
+                        await button_ctx.edit(embeds=pages[0], components=buttons)
+                        embed = interactions.Embed(
+                            title="Are you sure you want to delete your history?",
+                            description="This action cannot be undone.",
+                            color=0xFF0000,
+                            footer=interactions.EmbedFooter(
+                                text="This action will time out in 15 seconds."
+                            ),
                         )
-                        await button_ctx.edit("Your history has been deleted!")
+                        buttonsd = [
+                            interactions.Button(
+                                style=interactions.ButtonStyle.DANGER,
+                                label="Confirm",
+                                custom_id="confirm",
+                            ),
+                            interactions.Button(
+                                style=interactions.ButtonStyle.SECONDARY,
+                                label="Cancel",
+                                custom_id="cancel",
+                            ),
+                        ]
+                        message = await ctx.send(embeds=embed, components=buttonsd)
+                        try:
+                            buttond_ctx: interactions.ComponentContext = (
+                                await self.client.wait_for_component(
+                                    components=buttonsd,
+                                    check=check,
+                                    timeout=15,
+                                )
+                            )
+                            if buttond_ctx.custom_id == "confirm":
+                                collection.delete_many({"user_id": int(ctx.author.id)})
+                                embed = interactions.Embed(
+                                    title="Success!",
+                                    description="Your history has been deleted.",
+                                    color=0x00FF00,
+                                )
+                                await message.delete()
+                                await buttond_ctx.send(embeds=embed, ephemeral=True)
+                                buttons[0].disabled = True
+                                buttons[1].disabled = True
+                                buttons[2].disabled = True
+                                buttons[3].disabled = True
+                                buttons[4].disabled = True
+                                await button_ctx.edit(
+                                    embeds=pages[0], components=buttons
+                                )
+                            if buttond_ctx.custom_id == "cancel":
+                                embed = interactions.Embed(
+                                    title="Cancelled!",
+                                    description="Your history has not been deleted.",
+                                    color=0x00FF00,
+                                )
+                                await message.delete()
+                                buttons[0].disabled = True
+                                buttons[1].disabled = True
+                                buttons[2].disabled = False
+                                buttons[3].disabled = False
+                                buttons[4].disabled = False
+                                await buttond_ctx.send(embeds=embed, ephemeral=True)
+                                await button_ctx.edit(
+                                    embeds=pages[0], components=buttons
+                                )
+                        except asyncio.TimeoutError:
+                            embedsuc = interactions.Embed(
+                                title="Phew!",
+                                description="That was close! The message has self-destructed and your history is safe!",
+                                color=0x00FF00,
+                            )
+                            buttonsd[0].disabled = True
+                            buttonsd[1].disabled = True
+                            await message.delete()
+                            await ctx.send(embeds=embedsuc, ephemeral=True)
+                            buttons[0].disabled = True
+                            buttons[1].disabled = True
+                            buttons[2].disabled = False
+                            buttons[3].disabled = False
+                            buttons[4].disabled = False
+                            await button_ctx.edit(embeds=pages[0], components=buttons)
                 except asyncio.TimeoutError:
                     await ctx.send("You took too long to respond!", ephemeral=True)
 
