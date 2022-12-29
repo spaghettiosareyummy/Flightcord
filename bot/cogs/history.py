@@ -63,11 +63,13 @@ class FlightHistory(interactions.Extension):
                         style=interactions.ButtonStyle.PRIMARY,
                         emoji=interactions.Emoji(name="⏮️"),
                         custom_id="first",
+                        disabled=True,
                     ),
                     interactions.Button(
                         style=interactions.ButtonStyle.PRIMARY,
                         emoji=interactions.Emoji(name="◀️"),
                         custom_id="prev",
+                        disabled=True,
                     ),
                     interactions.Button(
                         style=interactions.ButtonStyle.PRIMARY,
@@ -97,6 +99,7 @@ class FlightHistory(interactions.Extension):
                 return False
 
             while True:
+
                 try:
                     button_ctx: interactions.ComponentContext = (
                         await self.client.wait_for_component(
@@ -105,23 +108,58 @@ class FlightHistory(interactions.Extension):
                     )
 
                     if button_ctx.custom_id == "first":
-                        current_index = 0
-                        await button_ctx.defer(edit_origin=True)
-                        await button_ctx.edit(embeds=pages[0])
-                    elif button_ctx.custom_id == "prev":
                         if current_index > 0:
+                            current_index = 0
+                            buttons[0].disabled = True
+                            buttons[1].disabled = True
+                            buttons[2].disabled = False
+                            buttons[3].disabled = False
+                            await button_ctx.defer(edit_origin=True)
+                            await button_ctx.edit(embeds=pages[0], components=buttons)
+                        # else:
+                        #     buttons[0].disabled = True
+                    elif button_ctx.custom_id == "prev":
+                        if current_index >= 1:
                             current_index -= 1
+                            if current_index == 0:
+                                buttons[0].disabled = True
+                                buttons[1].disabled = True
+                                buttons[2].disabled = False
+                                buttons[3].disabled = False
+                            else:
+                                buttons[0].disabled = False
+                                buttons[1].disabled = False
+                                buttons[2].disabled = False
+                                buttons[3].disabled = False
                             await button_ctx.defer(edit_origin=True)
-                            await button_ctx.edit(embeds=pages[current_index])
+                            await button_ctx.edit(
+                                embeds=pages[current_index], components=buttons
+                            )
                     elif button_ctx.custom_id == "next":
-                        if current_index < len(pages):
+                        if current_index < len(pages) - 1:
                             current_index += 1
+                            if current_index == len(pages) - 1:
+                                buttons[0].disabled = False
+                                buttons[1].disabled = False
+                                buttons[2].disabled = True
+                                buttons[3].disabled = True
+                            else:
+                                buttons[0].disabled = False
+                                buttons[1].disabled = False
+                                buttons[2].disabled = False
+                                buttons[3].disabled = False
                             await button_ctx.defer(edit_origin=True)
-                            await button_ctx.edit(embeds=pages[current_index])
+                            await button_ctx.edit(
+                                embeds=pages[current_index], components=buttons
+                            )
                     elif button_ctx.custom_id == "last":
                         current_index = -1
+                        buttons[0].disabled = False
+                        buttons[1].disabled = False
+                        buttons[2].disabled = True
+                        buttons[3].disabled = True
                         await button_ctx.defer(edit_origin=True)
-                        await button_ctx.edit(embeds=pages[-1])
+                        await button_ctx.edit(embeds=pages[-1], components=buttons)
                     elif button_ctx.custom_id == "delete":
                         collection.delete_many({"user_id": int(ctx.author.id)})
                         await button_ctx.defer(
@@ -129,7 +167,6 @@ class FlightHistory(interactions.Extension):
                             ephemeral=True,
                         )
                         await button_ctx.edit("Your history has been deleted!")
-
                 except asyncio.TimeoutError:
                     await ctx.send("You took too long to respond!", ephemeral=True)
 
