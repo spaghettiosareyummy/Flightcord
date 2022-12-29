@@ -44,7 +44,7 @@ class FlightHistory(interactions.Extension):
             for i in range(0, len(searches), 12):
                 embed = interactions.Embed(
                     title=f"Flight Search History for {ctx.author.name}",
-                    description=f"Page {i+1} of {len(searches)//12+1}",
+                    description=f"Page {i//12+1} out of {len(searches)//12+1}",
                     color=0x04A9A6,
                 )
                 embed.set_footer(text=f"")

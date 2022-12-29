@@ -8,6 +8,8 @@ import json
 import datetime
 import pymongo
 from interactions.ext.paginator import Page, Paginator
+import asyncio
+from interactions.ext.wait_for import setup
 
 logger = logutil.init_logger(os.path.basename(__file__))
 load_dotenv()
@@ -147,68 +149,152 @@ class GetFlight(interactions.Extension):
                         )
 
                     author_url = f"https://www.flightradar24.com/data/flights/{api_response[flight]['number'].replace(' ', '')}"
+
                     pages = [
-                        Page(
-                            embeds=interactions.Embed(
-                                title=title,
-                                description=f"Operated by: {api_response[flight]['airline']['name']}",
-                                color=0x04A9A6,
-                                footer=interactions.EmbedFooter(
-                                    text="Powered by Aerodatabox and Flightradar24"
+                        interactions.Embed(
+                            title=title,
+                            description=f"Operated by: {api_response[flight]['airline']['name']}",
+                            color=0x04A9A6,
+                            footer=interactions.EmbedFooter(
+                                text="Powered by Aerodatabox and Flightradar24"
+                            ),
+                            thumbnail=interactions.EmbedImageStruct(
+                                url="https://imgur.com/YqojWNd.png"
+                            ),
+                            image=interactions.EmbedImageStruct(url=image_url),
+                            author=interactions.EmbedAuthor(
+                                name="Click for Flight History",
+                                url=author_url,
+                                icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
+                            ),
+                            fields=[
+                                interactions.EmbedField(
+                                    name="Departure Airport",
+                                    value=api_response[flight]["departure"]["airport"][
+                                        "name"
+                                    ],
+                                    inline=True,
                                 ),
-                                thumbnail=interactions.EmbedImageStruct(
-                                    url="https://imgur.com/YqojWNd.png"
+                                interactions.EmbedField(
+                                    name="Departure Time",
+                                    value=depart_time,
+                                    inline=True,
                                 ),
-                                image=interactions.EmbedImageStruct(url=image_url),
-                                author=interactions.EmbedAuthor(
-                                    name="Click for Flight History",
-                                    url=author_url,
-                                    icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple128/v4/79/72/9a/79729a6b-2043-3317-95e9-3e877ed41086/source/512x512bb.jpg",
+                                interactions.EmbedField(
+                                    name="Arrival Airport",
+                                    value=api_response[flight]["arrival"]["airport"][
+                                        "name"
+                                    ],
+                                    inline=True,
                                 ),
-                                fields=[
-                                    interactions.EmbedField(
-                                        name="Departed From:",
-                                        value=f"{api_response[flight]['departure']['airport']['name']}",
-                                        inline=False,
-                                    ),
-                                    interactions.EmbedField(
-                                        name="Departed At (UTC):",
-                                        value=depart_time,
-                                        inline=False,
-                                    ),
-                                    interactions.EmbedField(
-                                        name="Arriving To:",
-                                        value=f"{api_response[flight]['arrival']['airport']['name']}",
-                                        inline=False,
-                                    ),
-                                    interactions.EmbedField(
-                                        name="Arriving At (UTC):",
-                                        value=arrive_time,
-                                        inline=True,
-                                    ),
-                                ],
-                            )
+                                interactions.EmbedField(
+                                    name="Arrival Time",
+                                    value=arrive_time,
+                                    inline=True,
+                                ),
+                            ],
                         ),
-                        # Page(
-                        #     embeds=interactions.Embed(
-                        #         title=f"Aircraft Info for {api_response[flight]['aircraft']['reg']}"
-                        #     )
-                        # ),  # TODO: Use a different API to get aircraft info
-                        Page(
-                            embeds=interactions.Embed(
-                                title=f"Departure Info for {api_response[flight]['departure']['airport']['name']}"
-                            )
+                        interactions.Embed(
+                            title="Aircraft Information",
+                            description=f"Registration: {api_response[flight]['aircraft']['reg']}",
+                            color=0x04A9A6,
+                            footer=interactions.EmbedFooter(
+                                text="Powered by Aerodatabox and Flightradar24"
+                            ),
+                            thumbnail=interactions.EmbedImageStruct(
+                                url="https://imgur.com/YqojWNd.png"
+                            ),
+                            image=interactions.EmbedImageStruct(url=image_url),
+                            author=interactions.EmbedAuthor(
+                                name="Click for Flight History",
+                                url=author_url,
+                                icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
+                            ),
+                            fields=[
+                                interactions.EmbedField(
+                                    name="Aircraft Type",
+                                    value=api_response[flight]["aircraft"]["model"],
+                                    inline=True,
+                                ),
+                                # interactions.EmbedField(
+                                #     name="Aircraft Manufacturer",
+                                #     value=api_response[flight]["aircraft"][
+                                #         "manufacturer"
+                                #     ],
+                                #     inline=True,
+                                # ),
+                                # interactions.EmbedField(
+                                #     name="Aircraft Model",
+                                #     value=api_response[flight]["aircraft"]["model"],
+                                #     inline=True,
+                                # ),
+                                # interactions.EmbedField(
+                                #     name="Aircraft ICAO",
+                                #     value=api_response[flight]["aircraft"]["icao"],
+                                #     inline=True,
+                                # ),
+                            ],
                         ),
-                        Page(
-                            embeds=interactions.Embed(
-                                title=f"Arrival Info for {api_response[flight]['arrival']['airport']['name']}"
-                            )
-                        ),  # Different API for these too
                     ]
-                    p = Paginator(
-                        client=self.client, ctx=ctx, use_buttons=False, pages=pages
-                    )
-                    await p.run()
+
+                    buttons = [
+                        interactions.Button(
+                            style=interactions.ButtonStyle.PRIMARY,
+                            label="Flight Info",
+                            custom_id="flight_info",
+                            emoji=interactions.Emoji(name="🎫"),
+                            disabled=True,
+                        ),
+                        interactions.Button(
+                            style=interactions.ButtonStyle.PRIMARY,
+                            label="Aircraft Info",
+                            custom_id="aircraft_info",
+                            emoji=interactions.Emoji(name="✈️"),
+                        ),
+                    ]
+
+                    await ctx.send(embeds=pages[0], components=buttons)
+                    page = "flight_info"
+
+                    async def check(button_ctx):
+                        if int(button_ctx.author.id) == int(ctx.author.id):
+                            return True
+                        await ctx.send(
+                            "You are not the author of this message!", hidden=True
+                        )
+                        return False
+
+                    while True:
+                        try:
+                            button_ctx: interactions.ComponentContext = (
+                                await self.client.wait_for_component(
+                                    components=buttons, check=check
+                                )
+                            )
+
+                            if button_ctx.custom_id == "flight_info":
+                                if page == "aircraft_info":
+                                    page = "flight_info"
+                                    buttons[0].disabled = True
+                                    buttons[1].disabled = False
+                                    await button_ctx.defer(edit_origin=True)
+                                    await button_ctx.edit(
+                                        embeds=pages[0], components=buttons
+                                    )
+
+                            elif button_ctx.custom_id == "aircraft_info":
+                                if page == "flight_info":
+                                    page = "aircraft_info"
+                                    buttons[0].disabled = False
+                                    buttons[1].disabled = True
+                                    await button_ctx.defer(edit_origin=True)
+                                    await button_ctx.edit(
+                                        embeds=pages[1], components=buttons
+                                    )
+
+                        except asyncio.TimeoutError:
+                            await ctx.send("Timed out!", hidden=True)
+                            break
 
                     previous = collection.find_one({"user_id": int(ctx.author.id)})
                     if previous is None:
