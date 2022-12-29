@@ -214,6 +214,9 @@ class GetFlight(interactions.Extension):
                                     "time": str(
                                         accurate_utc_conv(datetime.datetime.now())
                                     ),
+                                    "message_id": int(ctx.message.id),
+                                    "channel_id": int(ctx.channel.id),
+                                    "guild_id": int(ctx.guild.id),
                                 }
                             ],
                         }
@@ -231,6 +234,9 @@ class GetFlight(interactions.Extension):
                                         "time": str(
                                             accurate_utc_conv(datetime.datetime.now())
                                         ),
+                                        "message_id": int(ctx.message.id),
+                                        "channel_id": int(ctx.channel.id),
+                                        "guild_id": int(ctx.guild.id),
                                     }
                                 }
                             },
