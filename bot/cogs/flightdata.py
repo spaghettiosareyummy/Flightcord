@@ -137,11 +137,20 @@ class GetFlight(interactions.Extension):
                     except KeyError:
                         arrive_time = f"<t:{vague_utc_conv(api_response[flight]['arrival']['actualTimeUtc'])}:f>"
 
+                    try:
+                        title = (
+                            f"Flight Information for {api_response[flight]['callSign']}"
+                        )
+                    except KeyError:
+                        title = (
+                            f"Flight Information for {api_response[flight]['number']}"
+                        )
+
                     author_url = f"https://www.flightradar24.com/data/flights/{api_response[flight]['number'].replace(' ', '')}"
                     pages = [
                         Page(
                             embeds=interactions.Embed(
-                                title=f"Flight Information for {api_response[flight]['callSign']}",
+                                title=title,
                                 description=f"Operated by: {api_response[flight]['airline']['name']}",
                                 color=0x04A9A6,
                                 footer=interactions.EmbedFooter(
@@ -180,11 +189,11 @@ class GetFlight(interactions.Extension):
                                 ],
                             )
                         ),
-                        Page(
-                            embeds=interactions.Embed(
-                                title=f"Aircraft Info for {api_response[flight]['aircraft']['reg']}"
-                            )
-                        ),  # TODO: Use a different API to get aircraft info
+                        # Page(
+                        #     embeds=interactions.Embed(
+                        #         title=f"Aircraft Info for {api_response[flight]['aircraft']['reg']}"
+                        #     )
+                        # ),  # TODO: Use a different API to get aircraft info
                         Page(
                             embeds=interactions.Embed(
                                 title=f"Departure Info for {api_response[flight]['departure']['airport']['name']}"
@@ -208,7 +217,6 @@ class GetFlight(interactions.Extension):
                             "user_id": int(ctx.author.id),
                             "searches": [
                                 {
-                                    "callsign": api_response[flight]["callSign"],
                                     "flightnumber": api_response[flight]["number"],
                                     "reg": api_response[flight]["aircraft"]["reg"],
                                     "time": str(
@@ -228,7 +236,6 @@ class GetFlight(interactions.Extension):
                             {
                                 "$push": {
                                     "searches": {
-                                        "callsign": api_response[flight]["callSign"],
                                         "flightnumber": api_response[flight]["number"],
                                         "reg": api_response[flight]["aircraft"]["reg"],
                                         "time": str(
