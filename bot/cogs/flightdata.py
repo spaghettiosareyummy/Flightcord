@@ -24,10 +24,16 @@ collection = database.FlightSearchHist
 # Create a page for DEPARTURE and ARRIVAL information
 
 
-def get_unix_time(date: str):
-
+def vague_utc_conv(date: str):
     date_example = date.replace("Z", "").replace(" ", ", ")
     date_format = datetime.datetime.strptime(date_example, "%Y-%m-%d, %H:%M")
+    unix_time = datetime.datetime.timestamp(date_format)
+    return int(unix_time)
+
+
+def accurate_utc_conv(date: str):
+    date_str = str(date)
+    date_format = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S.%f")
     unix_time = datetime.datetime.timestamp(date_format)
     return int(unix_time)
 
@@ -122,14 +128,14 @@ class GetFlight(interactions.Extension):
                         image_url = None
 
                     try:
-                        depart_time = f"<t:{get_unix_time(api_response[flight]['departure']['actualTimeUtc'])}:f>"
+                        depart_time = f"<t:{vague_utc_conv(api_response[flight]['departure']['actualTimeUtc'])}:f>"
                     except KeyError:
-                        depart_time = f"<t:{get_unix_time(api_response[flight]['departure']['scheduledTimeUtc'])}:f>"
+                        depart_time = f"<t:{vague_utc_conv(api_response[flight]['departure']['scheduledTimeUtc'])}:f>"
 
                     try:
-                        arrive_time = f"<t:{get_unix_time(api_response[flight]['arrival']['scheduledTimeUtc'])}:f>"
+                        arrive_time = f"<t:{vague_utc_conv(api_response[flight]['arrival']['scheduledTimeUtc'])}:f>"
                     except KeyError:
-                        arrive_time = f"<t:{get_unix_time(api_response[flight]['arrival']['actualTimeUtc'])}:f>"
+                        arrive_time = f"<t:{vague_utc_conv(api_response[flight]['arrival']['actualTimeUtc'])}:f>"
 
                     author_url = f"https://www.flightradar24.com/data/flights/{api_response[flight]['number'].replace(' ', '')}"
                     pages = [
@@ -205,6 +211,9 @@ class GetFlight(interactions.Extension):
                                     "callsign": api_response[flight]["callSign"],
                                     "flightnumber": api_response[flight]["number"],
                                     "reg": api_response[flight]["aircraft"]["reg"],
+                                    "time": str(
+                                        accurate_utc_conv(datetime.datetime.now())
+                                    ),
                                 }
                             ],
                         }
@@ -219,10 +228,14 @@ class GetFlight(interactions.Extension):
                                         "callsign": api_response[flight]["callSign"],
                                         "flightnumber": api_response[flight]["number"],
                                         "reg": api_response[flight]["aircraft"]["reg"],
+                                        "time": str(
+                                            accurate_utc_conv(datetime.datetime.now())
+                                        ),
                                     }
                                 }
                             },
                         )
+                    print("Updated document")
 
                 else:
                     await ctx.send(
