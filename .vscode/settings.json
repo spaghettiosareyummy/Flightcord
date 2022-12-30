@@ -1,6 +1,7 @@
 {
     "python.analysis.extraPaths": [
-        "./bot/src"
+        "./bot/src",
+        "./bot/cogs"
     ],
     "editor.formatOnSave": true
 }

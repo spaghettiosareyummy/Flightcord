@@ -1,15 +1,15 @@
 import os
 import interactions
-from src.config import DEV_GUILD
+from src.config import DEBUG
 from src import logutil
 import requests
 from dotenv import load_dotenv
 import json
 import datetime
 import pymongo
-from interactions.ext.paginator import Page, Paginator
 import asyncio
 from interactions.ext.wait_for import setup
+from src.aerodatabox import AeroDataBox as adb, accurate_utc_conv, vague_utc_conv
 
 logger = logutil.init_logger(os.path.basename(__file__))
 load_dotenv()
@@ -24,20 +24,6 @@ collection = database.FlightSearchHist
 # Create a page for Aircraft Info
 # Create a page for Flight History??? might be unable
 # Create a page for DEPARTURE and ARRIVAL information
-
-
-def vague_utc_conv(date: str):
-    date_example = date.replace("Z", "").replace(" ", ", ")
-    date_format = datetime.datetime.strptime(date_example, "%Y-%m-%d, %H:%M")
-    unix_time = datetime.datetime.timestamp(date_format)
-    return int(unix_time)
-
-
-def accurate_utc_conv(date: str):
-    date_str = str(date)
-    date_format = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S.%f")
-    unix_time = datetime.datetime.timestamp(date_format)
-    return int(unix_time)
 
 
 class GetFlight(interactions.Extension):
@@ -90,264 +76,202 @@ class GetFlight(interactions.Extension):
     ) -> None:
         """The Subcommand for the getflight command"""
 
-        if callsign:
-            url = f"https://aerodatabox.p.rapidapi.com/flights/callsign/{callsign}"
-        elif flightnumber:
-            url = f"https://aerodatabox.p.rapidapi.com/flights/number/{flightnumber}"
-        elif reg:
-            url = f"https://aerodatabox.p.rapidapi.com/flights/reg/{reg}"
-        elif icao24:
-            url = f"https://aerodatabox.p.rapidapi.com/flights/icao24/{icao24}"
-
-        querystring = {"withAircraftImage": "true", "withLocation": "false"}
-
-        headers = {
-            "X-RapidAPI-Key": os.environ.get("KEY"),
-            "X-RapidAPI-Host": "aerodatabox.p.rapidapi.com",
-        }
-
-        try:
-            response = requests.request("GET", url, headers=headers, params=querystring)
-            api_response = response.json()
-        except json.decoder.JSONDecodeError as err:
-            logger.error(err)
+        flight = await adb.get_nearest(
+            flight_number=flightnumber,
+            callsign=callsign,
+            reg=reg,
+            icao=icao24,
+            ctx=ctx,
+            client=interactions.Client,
+        )
+        if flight is None:
             await ctx.send(
-                "Flight not found, check your input and try again", ephemeral=True
+                "This flight has already occured or is not in the database. Please try again with a different flight",
+                ephemeral=True,
             )
-            return
+        elif flight is False:
+            await ctx.send(
+                "There was an issue with collecting the flight data. This is most likely an internal error and not an error with your query",
+                ephemeral=True,
+            )
+        else:
 
-        for flight in range(len(api_response)):
-            try:
-                if (
-                    api_response[flight]["departure"]["airport"]["name"] is not None
-                    and api_response[flight]["status"] != "Arrived"
-                ):
-                    try:
-                        image_url = (
-                            f"{api_response[flight]['aircraft']['image']['url']}"
-                        )
-                    except KeyError:
-                        image_url = None
-
-                    try:
-                        depart_time = f"<t:{vague_utc_conv(api_response[flight]['departure']['actualTimeUtc'])}:f>"
-                    except KeyError:
-                        depart_time = f"<t:{vague_utc_conv(api_response[flight]['departure']['scheduledTimeUtc'])}:f>"
-
-                    try:
-                        arrive_time = f"<t:{vague_utc_conv(api_response[flight]['arrival']['scheduledTimeUtc'])}:f>"
-                    except KeyError:
-                        arrive_time = f"<t:{vague_utc_conv(api_response[flight]['arrival']['actualTimeUtc'])}:f>"
-
-                    try:
-                        title = (
-                            f"Flight Information for {api_response[flight]['callSign']}"
-                        )
-                    except KeyError:
-                        title = (
-                            f"Flight Information for {api_response[flight]['number']}"
-                        )
-
-                    author_url = f"https://www.flightradar24.com/data/flights/{api_response[flight]['number'].replace(' ', '')}"
-
-                    pages = [
-                        interactions.Embed(
-                            title=title,
-                            description=f"Operated by: {api_response[flight]['airline']['name']}",
-                            color=0x04A9A6,
-                            footer=interactions.EmbedFooter(
-                                text="Powered by Aerodatabox and Flightradar24"
-                            ),
-                            thumbnail=interactions.EmbedImageStruct(
-                                url="https://imgur.com/YqojWNd.png"
-                            ),
-                            image=interactions.EmbedImageStruct(url=image_url),
-                            author=interactions.EmbedAuthor(
-                                name="Click for Flight History",
-                                url=author_url,
-                                icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
-                            ),
-                            fields=[
-                                interactions.EmbedField(
-                                    name="Departure Airport",
-                                    value=api_response[flight]["departure"]["airport"][
-                                        "name"
-                                    ],
-                                    inline=True,
-                                ),
-                                interactions.EmbedField(
-                                    name="Departure Time",
-                                    value=depart_time,
-                                    inline=True,
-                                ),
-                                interactions.EmbedField(
-                                    name="Arrival Airport",
-                                    value=api_response[flight]["arrival"]["airport"][
-                                        "name"
-                                    ],
-                                    inline=True,
-                                ),
-                                interactions.EmbedField(
-                                    name="Arrival Time",
-                                    value=arrive_time,
-                                    inline=True,
-                                ),
-                            ],
+            pages = [
+                interactions.Embed(
+                    title=flight[4]["title"],
+                    description=f"Operated by: {flight[0]['airline']['name']}",
+                    color=0x04A9A6,
+                    footer=interactions.EmbedFooter(
+                        text="Powered by Aerodatabox and Flightradar24. This message will explode in 3 minutes"
+                    ),
+                    thumbnail=interactions.EmbedImageStruct(
+                        url="https://imgur.com/YqojWNd.png"
+                    ),
+                    image=interactions.EmbedImageStruct(url=flight[1]["image_url"]),
+                    author=interactions.EmbedAuthor(
+                        name="Click for Flight History",
+                        url=flight[5]["author_url"],
+                        icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
+                    ),
+                    fields=[
+                        interactions.EmbedField(
+                            name="Departure Airport",
+                            value=flight[0]["departure"]["airport"]["name"],
+                            inline=True,
                         ),
-                        interactions.Embed(
-                            title="Aircraft Information",
-                            description=f"Registration: {api_response[flight]['aircraft']['reg']}",
-                            color=0x04A9A6,
-                            footer=interactions.EmbedFooter(
-                                text="Powered by Aerodatabox and Flightradar24"
-                            ),
-                            thumbnail=interactions.EmbedImageStruct(
-                                url="https://imgur.com/YqojWNd.png"
-                            ),
-                            image=interactions.EmbedImageStruct(url=image_url),
-                            author=interactions.EmbedAuthor(
-                                name="Click for Flight History",
-                                url=author_url,
-                                icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
-                            ),
-                            fields=[
-                                interactions.EmbedField(
-                                    name="Aircraft Type",
-                                    value=api_response[flight]["aircraft"]["model"],
-                                    inline=True,
-                                ),
-                                # interactions.EmbedField(
-                                #     name="Aircraft Manufacturer",
-                                #     value=api_response[flight]["aircraft"][
-                                #         "manufacturer"
-                                #     ],
-                                #     inline=True,
-                                # ),
-                                # interactions.EmbedField(
-                                #     name="Aircraft Model",
-                                #     value=api_response[flight]["aircraft"]["model"],
-                                #     inline=True,
-                                # ),
-                                # interactions.EmbedField(
-                                #     name="Aircraft ICAO",
-                                #     value=api_response[flight]["aircraft"]["icao"],
-                                #     inline=True,
-                                # ),
-                            ],
+                        interactions.EmbedField(
+                            name="Departure Time(UTC)",
+                            value=flight[2]["depart_time"],
+                            inline=True,
                         ),
-                    ]
-
-                    buttons = [
-                        interactions.Button(
-                            style=interactions.ButtonStyle.PRIMARY,
-                            label="Flight Info",
-                            custom_id="flight_info",
-                            emoji=interactions.Emoji(name="🎫"),
-                            disabled=True,
+                        interactions.EmbedField(
+                            name="Arrival Airport",
+                            value=flight[0]["arrival"]["airport"]["name"],
+                            inline=False,
                         ),
-                        interactions.Button(
-                            style=interactions.ButtonStyle.PRIMARY,
-                            label="Aircraft Info",
-                            custom_id="aircraft_info",
-                            emoji=interactions.Emoji(name="✈️"),
+                        interactions.EmbedField(
+                            name="Arrival Time(UTC)",
+                            value=flight[3]["arrive_time"],
+                            inline=True,
                         ),
-                    ]
+                    ],
+                ),
+                interactions.Embed(
+                    title="Aircraft Information",
+                    description=f"Registration: {flight[0]['aircraft']['reg']}",
+                    color=0x04A9A6,
+                    footer=interactions.EmbedFooter(
+                        text="Powered by Aerodatabox and Flightradar24. This message will explode in 3 minutes"
+                    ),
+                    thumbnail=interactions.EmbedImageStruct(
+                        url="https://imgur.com/YqojWNd.png"
+                    ),
+                    image=interactions.EmbedImageStruct(url=flight[1]["image_url"]),
+                    author=interactions.EmbedAuthor(
+                        name="Click for Flight History",
+                        url=flight[5]["author_url"],
+                        icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
+                    ),
+                    fields=[
+                        interactions.EmbedField(
+                            name="Aircraft Type",
+                            value=flight[0]["aircraft"]["model"],
+                            inline=True,
+                        ),
+                        # interactions.EmbedField(
+                        #     name="Aircraft Manufacturer",
+                        #     value=api_response[flight]["aircraft"][
+                        #         "manufacturer"
+                        #     ],
+                        #     inline=True,
+                        # ),
+                        # interactions.EmbedField(
+                        #     name="Aircraft Model",
+                        #     value=api_response[flight]["aircraft"]["model"],
+                        #     inline=True,
+                        # ),
+                        # interactions.EmbedField(
+                        #     name="Aircraft ICAO",
+                        #     value=api_response[flight]["aircraft"]["icao"],
+                        #     inline=True,
+                        # ),
+                    ],
+                ),
+            ]
 
-                    await ctx.send(embeds=pages[0], components=buttons)
-                    page = "flight_info"
+            buttons = [
+                interactions.Button(
+                    style=interactions.ButtonStyle.PRIMARY,
+                    label="Flight Info",
+                    custom_id="flight_info",
+                    emoji=interactions.Emoji(name="🎫"),
+                    disabled=True,
+                ),
+                interactions.Button(
+                    style=interactions.ButtonStyle.PRIMARY,
+                    label="Aircraft Info",
+                    custom_id="aircraft_info",
+                    emoji=interactions.Emoji(name="✈️"),
+                ),
+            ]
 
-                    async def check(button_ctx):
-                        if int(button_ctx.author.id) == int(ctx.author.id):
-                            return True
-                        await ctx.send(
-                            "You are not the author of this message!", hidden=True
+            flightem = await ctx.send(embeds=pages[0], components=buttons)
+            page = "flight_info"
+
+            async def check(button_ctx):
+                if int(button_ctx.author.id) == int(ctx.author.id):
+                    return True
+                await ctx.send("You are not the author of this message!", hidden=True)
+                return False
+
+            while True:
+                try:
+                    button_ctx: interactions.ComponentContext = (
+                        await self.client.wait_for_component(
+                            components=buttons, check=check, timeout=180
                         )
-                        return False
-
-                    while True:
-                        try:
-                            button_ctx: interactions.ComponentContext = (
-                                await self.client.wait_for_component(
-                                    components=buttons, check=check
-                                )
-                            )
-
-                            if button_ctx.custom_id == "flight_info":
-                                if page == "aircraft_info":
-                                    page = "flight_info"
-                                    buttons[0].disabled = True
-                                    buttons[1].disabled = False
-                                    await button_ctx.defer(edit_origin=True)
-                                    await button_ctx.edit(
-                                        embeds=pages[0], components=buttons
-                                    )
-
-                            elif button_ctx.custom_id == "aircraft_info":
-                                if page == "flight_info":
-                                    page = "aircraft_info"
-                                    buttons[0].disabled = False
-                                    buttons[1].disabled = True
-                                    await button_ctx.defer(edit_origin=True)
-                                    await button_ctx.edit(
-                                        embeds=pages[1], components=buttons
-                                    )
-
-                        except asyncio.TimeoutError:
-                            await ctx.send("Timed out!", hidden=True)
-                            break
-
-                    previous = collection.find_one({"user_id": int(ctx.author.id)})
-                    if previous is None:
-                        """If the user does not already have a document in the database, create a new one"""
-                        newentry = {
-                            "user_id": int(ctx.author.id),
-                            "searches": [
-                                {
-                                    "flightnumber": api_response[flight]["number"],
-                                    "reg": api_response[flight]["aircraft"]["reg"],
-                                    "time": str(
-                                        accurate_utc_conv(datetime.datetime.now())
-                                    ),
-                                    "message_id": int(ctx.message.id),
-                                    "channel_id": int(ctx.channel.id),
-                                    "guild_id": int(ctx.guild.id),
-                                }
-                            ],
-                        }
-                        collection.insert_one(newentry)
-                    else:
-                        """If the user already has a document in the database, update it."""
-                        collection.update_one(
-                            {"user_id": int(ctx.author.id)},
-                            {
-                                "$push": {
-                                    "searches": {
-                                        "flightnumber": api_response[flight]["number"],
-                                        "reg": api_response[flight]["aircraft"]["reg"],
-                                        "time": str(
-                                            accurate_utc_conv(datetime.datetime.now())
-                                        ),
-                                        "message_id": int(ctx.message.id),
-                                        "channel_id": int(ctx.channel.id),
-                                        "guild_id": int(ctx.guild.id),
-                                    }
-                                }
-                            },
-                        )
-                    print("Updated document")
-
-                else:
-                    await ctx.send(
-                        "This flight has already occured or is not in the database. Please try again with a different flight",
-                        ephemeral=True,
                     )
-            except KeyError as err:
-                logger.error(err)
-                await ctx.send(
-                    "There was an issue with collecting the flight data. This is most likely an internal error and not an error with your query",
-                    ephemeral=True,
+
+                    if button_ctx.custom_id == "flight_info":
+                        if page == "aircraft_info":
+                            page = "flight_info"
+                            buttons[0].disabled = True
+                            buttons[1].disabled = False
+                            await button_ctx.defer(edit_origin=True)
+                            await button_ctx.edit(embeds=pages[0], components=buttons)
+
+                    elif button_ctx.custom_id == "aircraft_info":
+                        if page == "flight_info":
+                            page = "aircraft_info"
+                            buttons[0].disabled = False
+                            buttons[1].disabled = True
+                            await button_ctx.defer(edit_origin=True)
+                            await button_ctx.edit(embeds=pages[1], components=buttons)
+
+                except asyncio.TimeoutError:
+                    buttons[0].disabled = True
+                    buttons[1].disabled = True
+                    await flightem.edit(components=buttons)
+                    break
+                except interactions.api.error.LibraryException:
+                    break
+
+            previous = collection.find_one({"user_id": int(ctx.author.id)})
+            if previous is None:
+                """If the user does not already have a document in the database, create a new one"""
+                newentry = {
+                    "user_id": int(ctx.author.id),
+                    "searches": [
+                        {
+                            "flightnumber": flight[0]["number"],
+                            "reg": flight[0]["aircraft"]["reg"],
+                            "time": str(accurate_utc_conv(datetime.datetime.now())),
+                            "message_id": int(ctx.message.id),
+                            "channel_id": int(ctx.channel.id),
+                            "guild_id": int(ctx.guild.id),
+                        }
+                    ],
+                }
+                collection.insert_one(newentry)
+                if DEBUG == True:
+                    print("Updated Document")
+            else:
+                """If the user already has a document in the database, update it."""
+                collection.update_one(
+                    {"user_id": int(ctx.author.id)},
+                    {
+                        "$push": {
+                            "searches": {
+                                "flightnumber": flight[0]["number"],
+                                "reg": flight[0]["aircraft"]["reg"],
+                                "time": str(accurate_utc_conv(datetime.datetime.now())),
+                                "message_id": int(ctx.message.id),
+                                "channel_id": int(ctx.channel.id),
+                                "guild_id": int(ctx.guild.id),
+                            }
+                        }
+                    },
                 )
-                return
 
 
 def setup(client: interactions.Client):
