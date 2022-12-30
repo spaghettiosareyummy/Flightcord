@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import json
 import datetime
 import interactions
+
 from src import logutil
 
 logger = logutil.init_logger(os.path.basename(__file__))
@@ -27,9 +28,26 @@ def accurate_utc_conv(date: str):
 
 
 class AeroDataBox:
-    async def get_nearest(
-        ctx: interactions.CommandContext,
-        client: interactions.Client,
+    def get_aircraft(
+        reg: str = None,
+    ):
+        api_key = os.environ.get("KEY")
+        base_url = "https://aerodatabox.p.rapidapi.com/aircrafts/reg/"
+        url = f"{base_url}{reg}"
+        querystring = {"withRegistrations": "true", "withImage": "true"}
+        headers = {
+            "x-rapidapi-key": api_key,
+            "x-rapidapi-host": "aerodatabox.p.rapidapi.com",
+        }
+        try:
+            response = requests.request("GET", url, headers=headers, params=querystring)
+            api_response = response.json()
+            return api_response
+        except json.decoder.JSONDecodeError as err:
+            logger.error(err)
+            return None
+
+    def get_nearest(
         flight_number: str = None,
         callsign: str = None,
         reg: str = None,

@@ -36,7 +36,7 @@ class GetFlight(interactions.Extension):
 
     @interactions.extension_command(
         name="getflight",
-        description="search for a flight",
+        description="search for a live flight",
     )
     async def getflight(self, ctx: interactions.CommandContext) -> None:
         """The Base Command for the getflight command"""
@@ -76,14 +76,13 @@ class GetFlight(interactions.Extension):
     ) -> None:
         """The Subcommand for the getflight command"""
 
-        flight = await adb.get_nearest(
+        flight = adb.get_nearest(
             flight_number=flightnumber,
             callsign=callsign,
             reg=reg,
             icao=icao24,
-            ctx=ctx,
-            client=interactions.Client,
         )
+        aircraft = adb.get_aircraft(reg=f"{flight[0]['aircraft']['reg']}")
         if flight is None:
             await ctx.send(
                 "This flight has already occured or is not in the database. Please try again with a different flight",
@@ -102,7 +101,7 @@ class GetFlight(interactions.Extension):
                     description=f"Operated by: {flight[0]['airline']['name']}",
                     color=0x04A9A6,
                     footer=interactions.EmbedFooter(
-                        text="Powered by Aerodatabox and Flightradar24. This message will explode in 3 minutes"
+                        text="Note: Image may not represent actual flight. This message will explode in 3 minutes"
                     ),
                     thumbnail=interactions.EmbedImageStruct(
                         url="https://imgur.com/YqojWNd.png"
@@ -111,13 +110,12 @@ class GetFlight(interactions.Extension):
                     author=interactions.EmbedAuthor(
                         name="Click for Flight History",
                         url=flight[5]["author_url"],
-                        icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
                     ),
                     fields=[
                         interactions.EmbedField(
                             name="Departure Airport",
                             value=flight[0]["departure"]["airport"]["name"],
-                            inline=True,
+                            inline=False,
                         ),
                         interactions.EmbedField(
                             name="Departure Time(UTC)",
@@ -141,16 +139,15 @@ class GetFlight(interactions.Extension):
                     description=f"Registration: {flight[0]['aircraft']['reg']}",
                     color=0x04A9A6,
                     footer=interactions.EmbedFooter(
-                        text="Powered by Aerodatabox and Flightradar24. This message will explode in 3 minutes"
+                        text="Note: Image may not represent exact aircraft. This message will explode in 3 minutes"
                     ),
                     thumbnail=interactions.EmbedImageStruct(
                         url="https://imgur.com/YqojWNd.png"
                     ),
-                    image=interactions.EmbedImageStruct(url=flight[1]["image_url"]),
+                    image=interactions.EmbedImageStruct(url=aircraft["image"]["url"]),
                     author=interactions.EmbedAuthor(
                         name="Click for Flight History",
                         url=flight[5]["author_url"],
-                        icon_url="https://is5-ssl.mzstatic.com/image/thumb/Purple124/v4/0d/0d/0d/0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d/AppIcon-0-1x_U007emarketing-0-0-85-220-0-7.png/246x0w.png",
                     ),
                     fields=[
                         interactions.EmbedField(
@@ -181,17 +178,29 @@ class GetFlight(interactions.Extension):
 
             buttons = [
                 interactions.Button(
-                    style=interactions.ButtonStyle.PRIMARY,
+                    style=interactions.ButtonStyle.SECONDARY,
                     label="Flight Info",
                     custom_id="flight_info",
                     emoji=interactions.Emoji(name="🎫"),
                     disabled=True,
                 ),
                 interactions.Button(
-                    style=interactions.ButtonStyle.PRIMARY,
+                    style=interactions.ButtonStyle.SECONDARY,
                     label="Aircraft Info",
                     custom_id="aircraft_info",
                     emoji=interactions.Emoji(name="✈️"),
+                ),
+                interactions.Button(
+                    style=interactions.ButtonStyle.SECONDARY,
+                    label="Departure Info",
+                    custom_id="departure_info",
+                    emoji=interactions.Emoji(name="🛫"),
+                ),
+                interactions.Button(
+                    style=interactions.ButtonStyle.SECONDARY,
+                    label="Arrival Info",
+                    custom_id="arrival_info",
+                    emoji=interactions.Emoji(name="🛬"),
                 ),
             ]
 
