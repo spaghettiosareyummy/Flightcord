@@ -5,7 +5,7 @@ from src import logutil
 import requests
 from dotenv import load_dotenv
 import json
-import datetime
+from datetime import datetime
 import pymongo
 import asyncio
 from interactions.ext.wait_for import setup
@@ -20,7 +20,7 @@ pymongo_client = pymongo.MongoClient(os.environ.get("DB_URI"))
 database = pymongo_client.FlightDB
 collection = database.FlightSearchHist
 
-# TODO
+# TODO:
 # Create a page for Aircraft Info
 # Create a page for Flight History??? might be unable
 # Create a page for DEPARTURE and ARRIVAL information
@@ -82,7 +82,13 @@ class GetFlight(interactions.Extension):
             reg=reg,
             icao=icao24,
         )
-        aircraft = adb.get_aircraft(reg=f"{flight[0]['aircraft']['reg']}")
+        try:
+            aircraft = adb.get_aircraft(reg=f"{flight[0]['aircraft']['reg']}")
+        except TypeError as err:
+            logger.error(err)
+            aircraft = False
+        # else:
+        #     aircraft = False
         if flight is None:
             await ctx.send(
                 "This flight has already occured or is not in the database. Please try again with a different flight",
@@ -93,8 +99,13 @@ class GetFlight(interactions.Extension):
                 "There was an issue with collecting the flight data. This is most likely an internal error and not an error with your query",
                 ephemeral=True,
             )
-        else:
+        elif aircraft is False:
+            await ctx.send(
+                "There was an issue with collecting the aircraft data. This is most likely an internal error and not an error with your query",
+                ephemeral=True,
+            )
 
+        else:
             pages = [
                 interactions.Embed(
                     title=flight[4]["title"],
@@ -112,6 +123,16 @@ class GetFlight(interactions.Extension):
                         url=flight[5]["author_url"],
                     ),
                     fields=[
+                        interactions.EmbedField(
+                            name="Status",
+                            value=flight[0]["status"],
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="Codeshare Status",
+                            value=flight[0]["codeshareStatus"].replace("Is", ""),
+                            inline=True,
+                        ),
                         interactions.EmbedField(
                             name="Departure Airport",
                             value=flight[0]["departure"]["airport"]["name"],
@@ -141,10 +162,7 @@ class GetFlight(interactions.Extension):
                     footer=interactions.EmbedFooter(
                         text="Note: Image may not represent exact aircraft. This message will explode in 3 minutes"
                     ),
-                    thumbnail=interactions.EmbedImageStruct(
-                        url="https://imgur.com/YqojWNd.png"
-                    ),
-                    image=interactions.EmbedImageStruct(url=aircraft["image"]["url"]),
+                    image=interactions.EmbedImageStruct(url=aircraft[2]["image"]),
                     author=interactions.EmbedAuthor(
                         name="Click for Flight History",
                         url=flight[5]["author_url"],
@@ -152,26 +170,49 @@ class GetFlight(interactions.Extension):
                     fields=[
                         interactions.EmbedField(
                             name="Aircraft Type",
-                            value=flight[0]["aircraft"]["model"],
+                            value=aircraft[0]["typeName"],
                             inline=True,
                         ),
-                        # interactions.EmbedField(
-                        #     name="Aircraft Manufacturer",
-                        #     value=api_response[flight]["aircraft"][
-                        #         "manufacturer"
-                        #     ],
-                        #     inline=True,
-                        # ),
-                        # interactions.EmbedField(
-                        #     name="Aircraft Model",
-                        #     value=api_response[flight]["aircraft"]["model"],
-                        #     inline=True,
-                        # ),
-                        # interactions.EmbedField(
-                        #     name="Aircraft ICAO",
-                        #     value=api_response[flight]["aircraft"]["icao"],
-                        #     inline=True,
-                        # ),
+                        interactions.EmbedField(
+                            name="Aircraft ICAO",
+                            value=aircraft[0]["icaoCode"],
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="Aircraft IATA",
+                            value=aircraft[0]["iataCodeShort"],
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="Rollout Date",
+                            value=f"<t:{int(datetime.timestamp(datetime.fromisoformat(aircraft[0]['rolloutDate'])))}:d>",
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="First Flight",
+                            value=f"<t:{int(datetime.timestamp(datetime.fromisoformat(aircraft[0]['firstFlightDate'])))}:d>",
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="Aircraft Age",
+                            value=f"{aircraft[0]['ageYears']} Years",
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="# of Seats",
+                            value=aircraft[1]["num_seats"],
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="# of Engines",
+                            value=aircraft[0]["numEngines"],
+                            inline=True,
+                        ),
+                        interactions.EmbedField(
+                            name="Engine Type",
+                            value=aircraft[0]["engineType"],
+                            inline=True,
+                        ),
                     ],
                 ),
             ]
@@ -220,13 +261,14 @@ class GetFlight(interactions.Extension):
                             components=buttons, check=check, timeout=180
                         )
                     )
+                    await button_ctx.defer(edit_origin=True)
 
                     if button_ctx.custom_id == "flight_info":
                         if page == "aircraft_info":
                             page = "flight_info"
                             buttons[0].disabled = True
                             buttons[1].disabled = False
-                            await button_ctx.defer(edit_origin=True)
+
                             await button_ctx.edit(embeds=pages[0], components=buttons)
 
                     elif button_ctx.custom_id == "aircraft_info":
@@ -234,8 +276,22 @@ class GetFlight(interactions.Extension):
                             page = "aircraft_info"
                             buttons[0].disabled = False
                             buttons[1].disabled = True
-                            await button_ctx.defer(edit_origin=True)
+
                             await button_ctx.edit(embeds=pages[1], components=buttons)
+                    elif button_ctx.custom_id == "departure_info":
+                        if page == "flight_info":
+                            page = "departure_info"
+                            buttons[0].disabled = False
+                            buttons[2].disabled = True
+
+                            await button_ctx.edit(embeds=pages[2], components=buttons)
+                    elif button_ctx.custom_id == "arrival_info":
+                        if page == "flight_info":
+                            page = "arrival_info"
+                            buttons[0].disabled = False
+                            buttons[3].disabled = True
+
+                            await button_ctx.edit(embeds=pages[3], components=buttons)
 
                 except asyncio.TimeoutError:
                     buttons[0].disabled = True
@@ -254,7 +310,7 @@ class GetFlight(interactions.Extension):
                         {
                             "flightnumber": flight[0]["number"],
                             "reg": flight[0]["aircraft"]["reg"],
-                            "time": str(accurate_utc_conv(datetime.datetime.now())),
+                            "time": str(accurate_utc_conv(datetime.now())),
                             "message_id": int(ctx.message.id),
                             "channel_id": int(ctx.channel.id),
                             "guild_id": int(ctx.guild.id),
@@ -273,7 +329,7 @@ class GetFlight(interactions.Extension):
                             "searches": {
                                 "flightnumber": flight[0]["number"],
                                 "reg": flight[0]["aircraft"]["reg"],
-                                "time": str(accurate_utc_conv(datetime.datetime.now())),
+                                "time": str(accurate_utc_conv(datetime.now())),
                                 "message_id": int(ctx.message.id),
                                 "channel_id": int(ctx.channel.id),
                                 "guild_id": int(ctx.guild.id),
@@ -281,6 +337,8 @@ class GetFlight(interactions.Extension):
                         }
                     },
                 )
+                if DEBUG == True:
+                    print("Updated Document")
 
 
 def setup(client: interactions.Client):

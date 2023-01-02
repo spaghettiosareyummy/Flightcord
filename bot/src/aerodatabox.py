@@ -2,7 +2,7 @@ import requests
 import os
 from dotenv import load_dotenv
 import json
-import datetime
+from datetime import datetime
 import interactions
 
 from src import logutil
@@ -15,15 +15,15 @@ load_dotenv()
 
 def vague_utc_conv(date: str):
     date_example = date.replace("Z", "").replace(" ", ", ")
-    date_format = datetime.datetime.strptime(date_example, "%Y-%m-%d, %H:%M")
-    unix_time = datetime.datetime.timestamp(date_format)
+    date_format = datetime.strptime(date_example, "%Y-%m-%d, %H:%M")
+    unix_time = datetime.timestamp(date_format)
     return int(unix_time)
 
 
 def accurate_utc_conv(date: str):
     date_str = str(date)
-    date_format = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S.%f")
-    unix_time = datetime.datetime.timestamp(date_format)
+    date_format = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S.%f")
+    unix_time = datetime.timestamp(date_format)
     return int(unix_time)
 
 
@@ -42,10 +42,18 @@ class AeroDataBox:
         try:
             response = requests.request("GET", url, headers=headers, params=querystring)
             api_response = response.json()
-            return api_response
         except json.decoder.JSONDecodeError as err:
             logger.error(err)
             return None
+        try:
+            num_seats = {"num_seats": f"{api_response['seats']}"}
+        except KeyError:
+            num_seats = {"num_seats": "Unknown"}
+        try:
+            image = {"image": f"{api_response['image']['url']}"}
+        except KeyError:
+            image = {"image": "None"}
+        return (api_response, num_seats, image)
 
     def get_nearest(
         flight_number: str = None,
@@ -72,7 +80,8 @@ class AeroDataBox:
         try:
             response = requests.request("GET", url, headers=headers, params=querystring)
             api_response = response.json()
-        except json.decoder.JSONDecodeError:
+        except json.decoder.JSONDecodeError as err:
+            logger.error(err)
             return
 
         for flight in range(len(api_response)):
@@ -131,9 +140,6 @@ class AeroDataBox:
                         title,
                         author_url,
                     )
-
-                else:
-                    return None
             except KeyError as err:
                 logger.error(err)
                 return False
